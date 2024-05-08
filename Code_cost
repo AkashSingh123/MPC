@@ -1,0 +1,74 @@
+#include <iostream>
+#include <vector>
+#include <algorithm>
+#include <numeric>
+
+// Define the system dynamics (example: linear model)
+std::vector<std::vector<double>> A = {{1.0, 0.1}, {0.0, 0.9}};
+std::vector<std::vector<double>> B = {{0.0}, {0.1}};
+
+// Cost function parameters
+std::vector<std::vector<double>> Q = {{1.0, 0.0}, {0.0, 1.0}};  // Weight matrix for state
+double R = 0.1;                                                  // Weight for control input
+double h_ref = 0.0;                                              // Reference altitude
+
+// Prediction horizon and time step
+const int N = 10;
+const double dt = 1.0;
+
+// Define the cost function
+double cost_function(std::vector<double>& u, std::vector<double>& x) {
+    double cost = 0.0;
+    for (int k = 0; k < N; ++k) {
+        // System Dynamics Update
+        std::vector<double> x_next(2);
+        x_next[0] = A[0][0] * x[0] + A[0][1] * x[1] + B[0][0] * u[k];
+        x_next[1] = A[1][0] * x[0] + A[1][1] * x[1] + B[1][0] * u[k];
+
+        // Cost Calculation
+        double altitude_error = x_next[0] - h_ref;
+        double control_effort = u[k];
+        cost += ((altitude_error * Q[0][0] + control_effort * R) * altitude_error + (altitude_error * Q[1][0])) * altitude_error;
+    }
+    return cost;
+}
+
+// Define the constraint function
+std::vector<double> constraint_function(std::vector<double>& u, std::vector<double>& x) {
+    std::vector<double> x_next = x;
+    std::vector<double> constraints;
+    for (int k = 0; k < N; ++k) {
+        // System Dynamics Update
+        std::vector<double> x_next_temp(2);
+        x_next_temp[0] = A[0][0] * x_next[0] + A[0][1] * x_next[1] + B[0][0] * u[k];
+        x_next_temp[1] = A[1][0] * x_next[0] + A[1][1] * x_next[1] + B[1][0] * u[k];
+        x_next = x_next_temp;
+
+        // Constraint Calculation
+        constraints.push_back(x_next[0] - 1.0); // Example constraint: x_next <= 1.0
+    }
+    return constraints;
+}
+
+int main() {
+    // Example usage
+    std::vector<double> initial_state = {0.0, 0.0}; // Initial state
+    std::vector<double> optimal_control_input(N, 0.0);
+
+    double step = 0.1;
+    for (int i = 0; i < N; ++i) {
+        optimal_control_input[i] = step * (i + 1);
+    }
+
+    double total_cost = cost_function(optimal_control_input, initial_state);
+    std::cout << "Total Cost: " << total_cost << std::endl;
+
+    std::vector<double> constraints = constraint_function(optimal_control_input, initial_state);
+    std::cout << "Constraints: ";
+    for (const auto& constraint : constraints) {
+        std::cout << constraint << " ";
+    }
+    std::cout << std::endl;
+
+    return 0;
+}
