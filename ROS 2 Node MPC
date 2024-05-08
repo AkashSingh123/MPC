@@ -1,0 +1,77 @@
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/float64.hpp"
+#include <vector>
+#include <algorithm>
+#include <numeric>
+
+// Include necessary ROS2 message headers
+
+class MPCNode : public rclcpp::Node
+{
+public:
+    MPCNode() : Node("mpc_node")
+    {
+        // Initialize publishers, subscribers, and parameters
+        cost_publisher_ = this->create_publisher<std_msgs::msg::Float64>("cost", 10);
+        control_publisher_ = this->create_publisher<std_msgs::msg::Float64MultiArray>("control_input", 10);
+        state_subscription_ = this->create_subscription<std_msgs::msg::Float64MultiArray>("state", 10, std::bind(&MPCNode::state_callback, this, std::placeholders::_1));
+
+        // Initialize system dynamics, cost parameters, etc.
+        // Define other initialization tasks
+    }
+
+private:
+    rclcpp::Publisher<std_msgs::msg::Float64>::SharedPtr cost_publisher_;
+    rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr control_publisher_;
+    rclcpp::Subscription<std_msgs::msg::Float64MultiArray>::SharedPtr state_subscription_;
+
+    void state_callback(const std_msgs::msg::Float64MultiArray::SharedPtr msg)
+    {
+        // Extract state vector from message
+        std::vector<double> state;
+        for (auto data : msg->data)
+        {
+            state.push_back(data);
+        }
+
+        // Perform MPC optimization
+        std::vector<double> optimal_control_input = mpc_optimizer(state);
+
+        // Publish optimal control input
+        std_msgs::msg::Float64MultiArray control_msg;
+        control_msg.layout.dim.push_back(std_msgs::msg::MultiArrayDimension());
+        control_msg.layout.dim[0].size = optimal_control_input.size();
+        control_msg.layout.dim[0].stride = 1;
+        control_msg.layout.dim[0].label = "control_input";
+        control_msg.data = optimal_control_input;
+        control_publisher_->publish(control_msg);
+
+        // Calculate and publish cost
+        double total_cost = cost_function(optimal_control_input, state);
+        auto cost_msg = std::make_unique<std_msgs::msg::Float64>();
+        cost_msg->data = total_cost;
+        cost_publisher_->publish(std::move(cost_msg));
+    }
+
+    std::vector<double> mpc_optimizer(std::vector<double> &x)
+    {
+        // Implementation of MPC optimization
+        // Define the optimization algorithm, constraints, etc.
+        // Return optimal control input
+    }
+
+    double cost_function(std::vector<double> &u, std::vector<double> &x)
+    {
+        // Implementation of cost function calculation
+        // Return total cost
+    }
+};
+
+int main(int argc, char **argv)
+{
+    rclcpp::init(argc, argv);
+    auto node = std::make_shared<MPCNode>();
+    rclcpp::spin(node);
+    rclcpp::shutdown();
+    return 0;
+}
